@@ -1,0 +1,126 @@
+\documentclass{article}
+\usepackage{listings}
+\usepackage{lipsum}
+\usepackage{hyperref}
+\hypersetup{
+	 colorlinks   = true,
+     citecolor    = black,
+     linkcolor    = black,
+     urlcolor     = black
+}
+\usepackage{courier}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{xeCJK}
+\usepackage[]{algorithm2e}
+\lstset{basicstyle=\footnotesize\ttfamily,breaklines=true}
+\setcounter{tocdepth}{2}
+\lstset{framextopmargin=10pt}
+
+\begin{document}
+\title{Course Project - Principles of Database Systems \\ Hadoop branch}
+\author{张秋怡 12330402 \\ \href{mailto:joyeec9h3@gmail.com}{joyeec9h3@gmail.com}} 
+\date{\today}
+\maketitle
+
+\tableofcontents
+\section{Team Members}
+
+\begin{tabular}{l l l}
+Name              & Student number & Mail \\
+\hline
+张秋怡 & 12330402 &  \href{mailto:joyeec9h3@gmail.com}{joyeec9h3@gmail.com}  \\
+郑沛翼 & 12330418 &  \href{mailto:187840@qq.com}{187840@qq.com}  \\
+郑安恺 & 12330415 &  \href{mailto:573476807@qq.com}{573476807@qq.com}  \\
+郑穗展 & 12330402 &  \href{mailto:zhengszh3@gmail.com}{zhengszh3@gmail.com}  \\
+郑恺培 & 12330417 &  \href{mailto:753494474@qq.com}{753494474@qq.com}
+\end{tabular}
+
+\section{System Design}
+
+\subsection{Overview}
+
+\subsection{Naive Cube}
+
+\subsection{TSCube}
+
+\section{Implementation}
+
+\paragraph{}
+
+\subsection{Estimate}
+
+\subsection{Materialize}
+
+During the implementation, we discover that in batches where there are two hierarchies involved, the field in the first hierarchy would disturb the cubing process of the second one (illustrated in Figure~\ref{fig:interrupt}). Therefore, we decide to take an approach slightly different from the top-down cubing algorithm discussed in \cite{aggregate1} and \cite{aggregate2}. Instead of scanning the fields from the right, updating the previous set and output the measurement of current field on changes, we scan the fields from the left, updating the sets as soon as a new tuple is scanned, and output the measurement of following fields on changes. This approach would not cost more memory than the original top-down cubing algorithm, since th number and sizes of the sets we need to maintain will not change significantly. The pseudocode is in Figure~\ref{cubeal}:
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{l l l l l l}
+country & state & city & topic & category & product \\
+\hline
+1 & 2 & 10 & 1 & 20 & 5 \\
+1 & 2 & 13 & 1 & 20 & 5 \\
+1 & 2 & 14 & 1 & 20 & 5
+\end{tabular}
+
+\caption{In this example, the topics of the records don't change while the city has changed, so the uids in the $Set_{topic=1}$ will all be merged into the $Set_{city=10}$, resulting in wrong measurements.}
+\label{fig:interrupt}
+
+\end{figure}
+
+\begin{figure}[H]
+
+\centering
+\caption{A cubing algorithm derived from top-down cubing.}
+\label{cubeal}
+\end{figure}
+
+\subsection{Postprocess}
+
+\section{Experimental results}
+
+\subsection{Environment settings}
+
+\paragraph{}
+We perform the experiment on a cluster made up of our laptops. There are 4 nodes in total, 3 of them are slaves.
+
+\begin{figure}[H]
+\begin{tabular}{l l l l l}
+Role & OS & Memory & CPU & Disk \\
+\hline
+Master & Ubuntu 12.04 & 3848M & Intel i7-3517U & 256GB \\
+Slave & Ubuntu 13.04  & 7882M & Intel i7-3610QM & 500GB \\
+Slave & Ubuntu 13.04 & 1978M & Intel Pentium B950 & 500GB \\
+Slave & Ubuntu 13.04 & 3547M & Intel i3-2330MB & 500GB
+\end{tabular}
+\end{figure}
+
+\subsection{Experimental results on cluster}
+
+\begin{figure}[H]
+\begin{tabular}{l l l}
+Data Size & Naive & TSCube \\
+\hline
+$10^{5}$ & 43 & 129 \\
+$10^{6}$ & 94 & 180 \\
+$10^{7}$ & 696 & 563 \\
+$10^{8}$ & - & 4128 \\
+\end{tabular}
+\end{figure}
+
+\section{Reflection}
+
+\begin{thebibliography}{1}
+
+\bibitem{mrcube} Arnab Nandi, Cong Yu, Philip Bohannon, and Raghu Ramakrishnan. {\em Data cube materialization and mining over mapreduce.} IEEE Transactions on Knowledge and Data Engineering, 24(10):1747–1759, 2012.
+
+\bibitem{terasort} Yufei Tao, Wenqing Lin, and Xiaokui Xiao. {\em Minimal mapreduce algorithms.} In Proceedings of the 2013 ACM SIGMOD International Conference on Management of Data, SIGMOD ’13, pages 529–540, New York, NY, USA, 2013. ACM.
+
+\bibitem{aggregate1} Sameet Agarwal, Rakesh Agrawal, Prasad M. Deshpande, Ashish Gupta, Jeffrey F. Naughton, Raghu Ramakrishnan, and Sunita Sarawagi. {\em On the computation of multidimensional aggregates.} In IN PROCEED- INGS OF THE INTERNATIONAL CONFERENCE ON VERY LARGE DATABASES, pages 506–521, 1996. 
+
+\bibitem{aggregate2} Yihong Zhao, Prasad Deshpande, and Jeffrey F. Naughton. {\em An array-based algorithm for simultaneous multidimensional aggregates. } In Joan Peckham, editor, SIGMOD 1997, Proceedings ACM SIGMOD International Confer- ence on Management of Data, May 13-15, 1997, Tucson, Arizona, USA, pages 159–170. ACM Press, 1997.
+
+\end{thebibliography}
+
+\end{document}
