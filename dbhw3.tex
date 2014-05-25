@@ -1,6 +1,9 @@
 \documentclass{article}
-\usepackage{listings}
-\usepackage{lipsum}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.8}
+\usepackage{filecontents}
 \usepackage{hyperref}
 \hypersetup{
 	 colorlinks   = true,
@@ -12,12 +15,31 @@
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage{xeCJK}
-\usepackage[]{algorithm2e}
-\lstset{basicstyle=\footnotesize\ttfamily,breaklines=true}
 \setcounter{tocdepth}{2}
-\lstset{framextopmargin=10pt}
+
+\makeatletter
+\newcommand{\algorithmicbreak}{\textbf{break}}
+\newcommand{\BREAK}{\STATE \algorithmicbreak}
+\makeatother
+
+\begin{filecontents*}{naive.dat}
+size naive
+1e05 43
+1e06 94
+1e07 696
+\end{filecontents*}
+
+\begin{filecontents*}{tscube.dat}
+size tscube
+1e05 129
+1e06 180
+1e07 563
+1e08 4128
+\end{filecontents*}
 
 \begin{document}
+\bibliographystyle{acm}
+
 \title{Course Project - Principles of Database Systems \\ Hadoop branch}
 \author{张秋怡 12330402 \\ \href{mailto:joyeec9h3@gmail.com}{joyeec9h3@gmail.com}} 
 \date{\today}
@@ -26,6 +48,8 @@
 \tableofcontents
 \section{Team Members}
 
+\begin{table}[H]
+\centering
 \begin{tabular}{l l l}
 Name              & Student number & Mail \\
 \hline
@@ -35,6 +59,7 @@ Name              & Student number & Mail \\
 郑穗展 & 12330402 &  \href{mailto:zhengszh3@gmail.com}{zhengszh3@gmail.com}  \\
 郑恺培 & 12330417 &  \href{mailto:753494474@qq.com}{753494474@qq.com}
 \end{tabular}
+\end{table}
 
 \section{System Design}
 
@@ -52,9 +77,9 @@ Name              & Student number & Mail \\
 
 \subsection{Materialize}
 
-During the implementation, we discover that in batches where there are two hierarchies involved, the field in the first hierarchy would disturb the cubing process of the second one (illustrated in Figure~\ref{fig:interrupt}). Therefore, we decide to take an approach slightly different from the top-down cubing algorithm discussed in \cite{aggregate1} and \cite{aggregate2}. Instead of scanning the fields from the right, updating the previous set and output the measurement of current field on changes, we scan the fields from the left, updating the sets as soon as a new tuple is scanned, and output the measurement of following fields on changes. This approach would not cost more memory than the original top-down cubing algorithm, since th number and sizes of the sets we need to maintain will not change significantly. The pseudocode is in Figure~\ref{cubeal}:
+During the implementation, we discover that in batches where there are two hierarchies involved, the field in the first hierarchy would disturb the cubing process of the second one (illustrated in Table~\ref{table:interrupt}). Therefore, we decide to take an approach more simliar to the BUC algorithm mentioned in \cite{beyer1999bottom} than the top-down cubing algorithm discussed in \cite{agarwal1996computation} and \cite{zhao1997array}. Instead of scanning the fields from the right, updating the previous set and output the measurement of current field on changes, we scan the fields from the left, updating the sets as soon as a new tuple is scanned, and output the measurement of following fields on changes. This approach would not cost more memory than the original top-down cubing algorithm, since th number and sizes of the sets we need to maintain will not change greatly. The most significant change lies in the number of insertion into these sets. The pseudocode of this algorithm is explained in Algorithm~\ref{alg:cubeal}:
 
-\begin{figure}[H]
+\begin{table}[H]
 \centering
 \begin{tabular}{l l l l l l}
 country & state & city & topic & category & product \\
@@ -62,19 +87,33 @@ country & state & city & topic & category & product \\
 1 & 2 & 10 & 1 & 20 & 5 \\
 1 & 2 & 13 & 1 & 20 & 5 \\
 1 & 2 & 14 & 1 & 20 & 5
+
 \end{tabular}
-
 \caption{In this example, the topics of the records don't change while the city has changed, so the uids in the $Set_{topic=1}$ will all be merged into the $Set_{city=10}$, resulting in wrong measurements.}
-\label{fig:interrupt}
+\label{table:interrupt}
+\end{table}
 
-\end{figure}
-
-\begin{figure}[H]
-
+\begin{algorithm}[H]
 \centering
-\caption{A cubing algorithm derived from top-down cubing.}
-\label{cubeal}
-\end{figure}
+\caption{The cubing algorithm}
+\label{alg:cubeal}
+\begin{algorithmic}[1]  
+\FOR{each K-V pair}
+\STATE $B \Leftarrow$ the batch this K-V pair belongs to
+\STATE $dim \Leftarrow$ The starting dimension of B
+\STATE $numDims \Leftarrow$ The total number of dimensions of B
+\FOR{$i=dim$; $i<numDims$; $i++$ }
+\IF{The field in $i$ changes}
+\STATE Output the measure of this and each subsequent dimensions
+\STATE Update the sets of this and each subsequent dimensions
+\BREAK
+\ELSE
+\STATE Add the uid into $Set[i]$
+\ENDIF
+\ENDFOR
+\ENDFOR   
+\end{algorithmic}  
+\end{algorithm}
 
 \subsection{Postprocess}
 
@@ -83,9 +122,10 @@ country & state & city & topic & category & product \\
 \subsection{Environment settings}
 
 \paragraph{}
-We perform the experiment on a cluster made up of our laptops. There are 4 nodes in total, 3 of them are slaves.
+We perform the experiment on a cluster made up of our laptops. There are 4 nodes in total, 3 of them are slaves. The hardware environment is listed in Table~\ref{table:env} Each of them runs Hadoop-1.0.4 and Python 2.7+.
 
-\begin{figure}[H]
+\begin{table}[H]
+\centering
 \begin{tabular}{l l l l l}
 Role & OS & Memory & CPU & Disk \\
 \hline
@@ -94,33 +134,33 @@ Slave & Ubuntu 13.04  & 7882M & Intel i7-3610QM & 500GB \\
 Slave & Ubuntu 13.04 & 1978M & Intel Pentium B950 & 500GB \\
 Slave & Ubuntu 13.04 & 3547M & Intel i3-2330MB & 500GB
 \end{tabular}
-\end{figure}
+
+\caption{Hardware environment}
+\label{table:env}
+\end{table}
 
 \subsection{Experimental results on cluster}
 
 \begin{figure}[H]
-\begin{tabular}{l l l}
-Data Size & Naive & TSCube \\
-\hline
-$10^{5}$ & 43 & 129 \\
-$10^{6}$ & 94 & 180 \\
-$10^{7}$ & 696 & 563 \\
-$10^{8}$ & - & 4128 \\
-\end{tabular}
+
+\begin{tikzpicture}
+\begin{loglogaxis}[
+title={Performance of Naive cube and TSCube},
+xlabel={Data Size},
+ylabel={Time(s)},
+legend pos=outer north east
+]
+\addplot table[x=size,y=naive] {naive.dat};\addlegendentry{Naive}
+\addplot table[x=size,y=tscube] {tscube.dat};\addlegendentry{TSCube}
+\end{loglogaxis}
+\end{tikzpicture}
+
+\caption{Performance of Naive cube and TSCube}
+\label{fig:performance}
 \end{figure}
 
 \section{Reflection}
 
-\begin{thebibliography}{1}
-
-\bibitem{mrcube} Arnab Nandi, Cong Yu, Philip Bohannon, and Raghu Ramakrishnan. {\em Data cube materialization and mining over mapreduce.} IEEE Transactions on Knowledge and Data Engineering, 24(10):1747–1759, 2012.
-
-\bibitem{terasort} Yufei Tao, Wenqing Lin, and Xiaokui Xiao. {\em Minimal mapreduce algorithms.} In Proceedings of the 2013 ACM SIGMOD International Conference on Management of Data, SIGMOD ’13, pages 529–540, New York, NY, USA, 2013. ACM.
-
-\bibitem{aggregate1} Sameet Agarwal, Rakesh Agrawal, Prasad M. Deshpande, Ashish Gupta, Jeffrey F. Naughton, Raghu Ramakrishnan, and Sunita Sarawagi. {\em On the computation of multidimensional aggregates.} In IN PROCEED- INGS OF THE INTERNATIONAL CONFERENCE ON VERY LARGE DATABASES, pages 506–521, 1996. 
-
-\bibitem{aggregate2} Yihong Zhao, Prasad Deshpande, and Jeffrey F. Naughton. {\em An array-based algorithm for simultaneous multidimensional aggregates. } In Joan Peckham, editor, SIGMOD 1997, Proceedings ACM SIGMOD International Confer- ence on Management of Data, May 13-15, 1997, Tucson, Arizona, USA, pages 159–170. ACM Press, 1997.
-
-\end{thebibliography}
+\bibliography{tscube}
 
 \end{document}
