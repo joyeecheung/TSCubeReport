@@ -3,7 +3,6 @@
 \usepackage{algpseudocode}
 \usepackage{subfigure}
 \usepackage{tikz}
-%\usepackage{algorithmic}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.8}
 \usepackage{filecontents}
@@ -39,7 +38,7 @@ size tscube
 \bibliographystyle{acm}
 
 \title{Course Project - Principles of Database Systems \\ Hadoop branch}
-\author{张秋怡 12330402 \\ \href{mailto:joyeec9h3@gmail.com}{joyeec9h3@gmail.com}} 
+\author{张秋怡 \\ \href{mailto:joyeec9h3@gmail.com}{joyeec9h3@gmail.com}} 
 \date{\today}
 \maketitle
 
@@ -65,7 +64,7 @@ In this project, we manage to accelerate the cube materialization on holistic me
 
 \subsection{Overview}
 
-The dataset for evaluation is compatible with the running example in \cite{nandi2012data}. We have used the Naive Cube algorithm and TSCube algorithm to calculate the DISTINCT-COUNT measure on this dataset. The input and output is illustrated in Figure~\ref{fig:example}.
+The dataset for evaluation is compatible with the running example in \cite{nandi2012data}. We have used the Naive Cube algorithm and TSCube algorithm to calculate the DISTINCT-COUNT measure on this dataset. The inputs and outputs are illustrated in Figure~\ref{fig:example}.
 
 \begin{figure}[h]
 \centering
@@ -80,7 +79,7 @@ rid  & uid  & country & state & city & topic & category & product & sales \\
 \end{tabular}
 }
 \subfigure[Output]{
-\begin{tabular}{l l l}
+\begin{tabular}{l|l l}
 indexes & values & measure \\
 \hline
 2 3 4 & 3 23 1132 & 10 \\
@@ -88,7 +87,7 @@ indexes & values & measure \\
 2 & 3 & 992\\
 \end{tabular}
 }
-\caption{Input and output format}
+\caption{Input and output examples}
 \label{fig:example}
 \end{figure}
 
@@ -122,7 +121,7 @@ Our implementation can be found in \url{https://github.com/joyeec9h3/naivecube}.
 
 \subsection{TSCube}
 
-TSCube consists of three phases:
+TSCube consists of three phases.
 
 \subsubsection{Estimate}
 During the estimate phase, we first sample from the original dataset with probability $\rho=\frac{1}{m}\ln(np)$ to achieve minimality, according to \cite{tao2013minimal}. Then we divide the sorted sample evenly into $p$ intervals, save the $p - 1$ boundaries to aid partitioning later.
@@ -173,7 +172,7 @@ In this phase, we decompose the dataset into several batches, each involves one 
 \end{figure}
 
 \subsubsection{Postprocess}
-The materializate phase ensures that the operation in this phase will be algebraic. We can simply merge the measures of each partial group by adding them together.
+The materialize phase ensures that the operation in this phase will be algebraic. We can simply merge the measures of each partial group by adding them together.
 
 \section{Implementation}
 
@@ -252,7 +251,7 @@ country & state & city & topic & category & product \\
 
 During the implementation, we discover that in batches where there are two hierarchies involved, the field in the first hierarchy would disturb the cubing process of the second one (illustrated in Table~\ref{table:interrupt}). Therefore, we decide to take an approach more simliar to the BUC algorithm mentioned in \cite{beyer1999bottom} than the top-down cubing algorithm discussed in \cite{agarwal1996computation} and \cite{zhao1997array}. Instead of scanning the fields from the top, updating the previous set and output the measures of current field on changes, we scan the fields from the bottom, updating the sets as soon as a new tuple is scanned, and output the measures of following fields on changes. 
 \\
-This approach would not cost more memory than the original top-down cubing algorithm, since th number and sizes of the sets we need to maintain will not change greatly. The most significant change lies in the number of insertion into these sets. The pseudocode of this algorithm is explained in Algorithm~\ref{alg:cubeal}.
+This approach would not cost more memory than the original top-down cubing algorithm, since the number and sizes of the sets we need to maintain will not change greatly. The most significant change lies in the number of insertion into these sets. The pseudocode of this algorithm is explained in Algorithm~\ref{alg:cubeal}.
 
 \begin{algorithm}[H]
 \centering
@@ -301,7 +300,7 @@ The post processing is relatively simple. Since the materialization ensures that
 \subsection{Environment settings}
 
 \paragraph{}
-We perform the experiment on a cluster made up of our laptops. There are 4 nodes in total, 3 of them are slaves, each of them runs Hadoop-1.0.4 and Python 2.7+. The hardware environment is listed in Table~\ref{table:env}. We use the standard CPython intepreter to execute the programs, though presumably other optimized implementation (e.g. PyPy) should accelerate the execution.
+We perform the experiment on a cluster made up of our laptops. There are 4 nodes in total, 3 of them are slaves, each of them runs Hadoop-1.0.4 and Python 2.7+. The environment on each node is listed in Table~\ref{table:env}. We use the standard CPython intepreter to execute the programs, though presumably other optimized implementation (e.g. PyPy) should accelerate the execution.
 
 \begin{table}[h]
 \centering
@@ -314,7 +313,7 @@ Slave & Ubuntu 13.04 & 1978M & Intel Pentium B950 & 500GB \\
 Slave & Ubuntu 13.04 & 3547M & Intel i3-2330MB & 500GB
 \end{tabular}
 
-\caption{Hardware environment}
+\caption{Environment}
 \label{table:env}
 \end{table}
 
