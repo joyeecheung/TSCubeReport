@@ -2,6 +2,7 @@
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{subfigure}
+\usepackage{tikz}
 %\usepackage{algorithmic}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.8}
@@ -68,7 +69,6 @@ The dataset for evaluation is compatible with the running example in \cite{nandi
 
 \begin{figure}[h]
 \centering
-\hfill
 \subfigure[Input]{
 \begin{tabular}{l l l l l l l l l}
 rid  & uid  & country & state & city & topic & category & product & sales \\
@@ -79,7 +79,6 @@ rid  & uid  & country & state & city & topic & category & product & sales \\
 4 & 468352 & 2 & 57 & 2410 & 2 & 37 & 3688 & 9561.13
 \end{tabular}
 }
-\hfill
 \subfigure[Output]{
 \begin{tabular}{l l l}
 indexes & values & measure \\
@@ -89,7 +88,6 @@ indexes & values & measure \\
 2 & 3 & 992\\
 \end{tabular}
 }
-\hfill
 \caption{Input and output format}
 \label{fig:example}
 \end{figure}
@@ -98,7 +96,7 @@ indexes & values & measure \\
 
 First we implement the Naive Cube algorithm mentioned in \cite{nandi2012data}. The pseudocode of this algorithm is shown in Algorithm~\ref{alg:naive}.
 
-\begin{algorithm}[h]
+\begin{algorithm}[H]
 \centering
 \caption{The Naive Cube algorithm}
 \label{alg:naive}
@@ -107,7 +105,7 @@ First we implement the Naive Cube algorithm mentioned in \cite{nandi2012data}. T
       \State let C be The Cube Lattice
       \For{each tuple e in the data}
       	\For{each region R in C}
-        	\State k = R(e)\Comment{R() prunes out the values not in R}
+        	\State k = R(e)\Comment{R(e) prunes out the values not in R}
         	\State \textsc{emit} k $\Rightarrow$ e
         \EndFor
       \EndFor
@@ -127,13 +125,55 @@ Our implementation can be found in \url{https://github.com/joyeec9h3/naivecube}.
 TSCube consists of three phases:
 
 \subsubsection{Estimate}
-In this phase, we sample from the original dataset with probability $\rho=\frac{1}{m}\ln(np)$ to achieve minimality, according to \cite{tao2013minimal}. Then we divide the sorted sample evenly into $p$ intervals, save the $p - 1$ boundaries to aid partitioning later.
+During the estimate phase, we first sample from the original dataset with probability $\rho=\frac{1}{m}\ln(np)$ to achieve minimality, according to \cite{tao2013minimal}. Then we divide the sorted sample evenly into $p$ intervals, save the $p - 1$ boundaries to aid partitioning later.
 
 \subsubsection{Materialize}
-In this phase, we decompose the dataset into several batches, each involves one or more dimensional hierarchies. For each batch, we extract the useful fields of each tuple, and use the boundaries produced in the previous phase to send them to the right partition. Since the boundaries are properly sorted, the partitions are also globally sorted. By putting uid into the partition key, we can rest assure that tuples with the same uid in the same batch will go to the same partition. In this way, we don't have to worry about the measure being holistic in the following phase. After partitioning, we can run a cubing algorithm on each partition, and output each result for post processing.
+In this phase, we decompose the dataset into several batches, each involves one or more dimensional hierarchies. The batching plan is illustrated in Figure~\ref{fig:batch}. For each batch, we extract the useful fields of each tuple, and use the boundaries produced in the previous phase to send them to the right partition. Since the boundaries are properly sorted, the partitions are also globally sorted. By putting uid into the partition key, we can rest assure that tuples with the same uid in the same batch will go to the same partition. In this way, we don't have to worry about the measure being holistic in the following phase. After partitioning, we can run a cubing algorithm on each partition, and output each result for post processing.
+
+\begin{figure}[h]
+\centering
+\subfigure[Batch1]{
+\begin{tikzpicture}[scale=.3]
+  \node (co) at (0,-6) {$<country, *>$};
+  \node (st) at (-1,-3) {$<state, *>$};
+  \node (ci) at (-2,0) {$<city, *>$};
+  \node (cito) at (-1,3) {$<city, topic>$};
+  \node (cica) at (0,6) {$<city, category>$};
+  \node (cipr) at (1,9) {$<city, product>$};
+  \draw (co) -- (st) -- (ci) -- (cito) -- (cica) -- (cipr);
+\end{tikzpicture}
+}
+\subfigure[Batch2]{
+\begin{tikzpicture}[scale=.4]
+  \node (stpr) at (0,-2) {$<state, topic>$};
+  \node (stca) at (1,0) {$<state, category>$};
+  \node (stto) at (2,2) {$<state, product>$};
+  \draw (stpr) -- (stca) -- (stto) ;
+\end{tikzpicture}
+}
+
+\subfigure[Batch3]{
+\begin{tikzpicture}[scale=.4]
+  \node (stpr) at (0,-2) {$<country, topic>$};
+  \node (stca) at (1,0) {$<country, category>$};
+  \node (stto) at (2,2) {$<country, product>$};
+  \draw (stpr) -- (stca) -- (stto) ;
+\end{tikzpicture}
+}
+\subfigure[Batch4]{
+\begin{tikzpicture}[scale=.4]
+  \node (stpr) at (0,-2) {$<*, topic>$};
+  \node (stca) at (1,0) {$<*, category>$};
+  \node (stto) at (2,2) {$<*, product>$};
+  \draw (stpr) -- (stca) -- (stto) ;
+\end{tikzpicture}
+}
+\caption{Batching plan}
+\label{fig:batch}
+\end{figure}
 
 \subsubsection{Postprocess}
-The materialization phase ensures that the operation in this phase will be algebraic. We can simply merge the measures of each partial group by adding them together.
+The materializate phase ensures that the operation in this phase will be algebraic. We can simply merge the measures of each partial group by adding them together.
 
 \section{Implementation}
 
@@ -170,7 +210,8 @@ First we compute $\rho=\frac{1}{m}\ln(np)$. In the mapper, for each sampled tupl
 
 \subsection{Materialize}
 
-This phase is illustrated in Algorithm~\ref{alg:materialize}. In the mapper, we determine the partition that a tuple falls in for each batch by the values of the shortest region in the batch and the uid in this tuple. Thus we can globally sort each partition by batch and uid, and make sure that tuples with the same uid in the same batch will go to the same partition. After mapping, we instruct Hadoop to partition the output of mappers by the computed partition id, and sort within each partition by the values of the shortest and longest region to aid cubing in the reducers.
+\paragraph{}
+This phase is illustrated in Algorithm~\ref{alg:materialize}. In the mapper, we determine the partition that a tuple falls in for each batch by the values of the shortest region in the batch and the uid in this tuple. Thus we can globally sort each partition by batch and uid, and make sure that tuples with the same uid in the same batch will go to the same partition. After mapping, we instruct Hadoop to partition the output of mappers by the computed partition id, and sort within each partition by the values of the shortest and longest region to aid cubing in the reducers. 
 
 \begin{algorithm}[h]
 \centering
@@ -193,9 +234,27 @@ This phase is illustrated in Algorithm~\ref{alg:materialize}. In the mapper, we 
   \end{algorithmic}
 \end{algorithm}
 
-During the implementation, we discover that in batches where there are two hierarchies involved, the field in the first hierarchy would disturb the cubing process of the second one (illustrated in Table~\ref{table:interrupt}). Therefore, we decide to take an approach more simliar to the BUC algorithm mentioned in \cite{beyer1999bottom} than the top-down cubing algorithm discussed in \cite{agarwal1996computation} and \cite{zhao1997array}. Instead of scanning the fields from the top, updating the previous set and output the measures of current field on changes, we scan the fields from the bottom, updating the sets as soon as a new tuple is scanned, and output the measures of following fields on changes. This approach would not cost more memory than the original top-down cubing algorithm, since th number and sizes of the sets we need to maintain will not change greatly. The most significant change lies in the number of insertion into these sets. The pseudocode of this algorithm is explained in Algorithm~\ref{alg:cubeal}.
+To obtain the partition for each tuple in each batch, we put the results of the first phase into the Hadoop Distributed Cache to avoid extra network I/O. In the mapper, we simply open the cached partition file and use binary search to find the desired partition.
 
-\begin{algorithm}[h]
+\begin{table}[h]
+\centering
+\begin{tabular}{l l l l l l}
+country & state & city & topic & category & product \\
+\hline
+1 & 2 & 10 & 1 & 20 & 5 \\
+1 & 2 & 13 & 1 & 20 & 5 \\
+1 & 2 & 14 & 1 & 20 & 5
+
+\end{tabular}
+\caption{In this example, the topics of the records don't change while the city has changed, so the uids in the $Set_{topic=1}$ will all be merged into the $Set_{city=10}$, resulting in wrong measures.}
+\label{table:interrupt}
+\end{table}
+
+During the implementation, we discover that in batches where there are two hierarchies involved, the field in the first hierarchy would disturb the cubing process of the second one (illustrated in Table~\ref{table:interrupt}). Therefore, we decide to take an approach more simliar to the BUC algorithm mentioned in \cite{beyer1999bottom} than the top-down cubing algorithm discussed in \cite{agarwal1996computation} and \cite{zhao1997array}. Instead of scanning the fields from the top, updating the previous set and output the measures of current field on changes, we scan the fields from the bottom, updating the sets as soon as a new tuple is scanned, and output the measures of following fields on changes. 
+\\
+This approach would not cost more memory than the original top-down cubing algorithm, since th number and sizes of the sets we need to maintain will not change greatly. The most significant change lies in the number of insertion into these sets. The pseudocode of this algorithm is explained in Algorithm~\ref{alg:cubeal}.
+
+\begin{algorithm}[H]
 \centering
 \caption{The cubing algorithm}
 \label{alg:cubeal}
@@ -217,25 +276,11 @@ During the implementation, we discover that in batches where there are two hiera
 \end{algorithmic}  
 \end{algorithm}
 
-\begin{table}[h]
-\centering
-\begin{tabular}{l l l l l l}
-country & state & city & topic & category & product \\
-\hline
-1 & 2 & 10 & 1 & 20 & 5 \\
-1 & 2 & 13 & 1 & 20 & 5 \\
-1 & 2 & 14 & 1 & 20 & 5
-
-\end{tabular}
-\caption{In this example, the topics of the records don't change while the city has changed, so the uids in the $Set_{topic=1}$ will all be merged into the $Set_{city=10}$, resulting in wrong measures.}
-\label{table:interrupt}
-\end{table}
-
 \subsection{Postprocess}
 
 The post processing is relatively simple. Since the materialization ensures that this phase will be algebraic, all we need to do is add the measures of each partial cube together, as illustrated in Algorithm~\ref{alg:post}.
 
-\begin{algorithm}[h]
+\begin{algorithm}[H]
 \centering
 \caption{TSCube Postprocess}
 \label{alg:post}
@@ -273,11 +318,11 @@ Slave & Ubuntu 13.04 & 3547M & Intel i3-2330MB & 500GB
 \label{table:env}
 \end{table}
 
-\subsection{Experimental results on cluster}
+\subsection{Experimental results on the cluster}
 
-The experimental results is showin in Figure~\ref{fig:performance}. The Naive Cube outperforms TSCube for small datasets due to the extremely low overhead costs, as is consistent with the description in \cite{nandi2012data}. But when the size of the dataset goes up, TSCube starts to perform better than the Naive approach, while Naive Cube just fails when the size of the dataset reach a certain point due to the burden of intermediate data and size of large groups.
+The experimental results is shown in Figure~\ref{fig:performance}. The Naive Cube outperforms TSCube for small datasets due to the extremely low overhead costs, as is consistent with the description in \cite{nandi2012data}. But when the size of the dataset goes up, TSCube starts to perform better than the Naive approach, while Naive Cube just fails when the size of the dataset reach a certain point due to the burden of intermediate data and size of large groups.
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{loglogaxis}[
